@@ -297,6 +297,7 @@ class ResNet(nn.Module):
         norm_eval (bool): Whether to set norm layers to eval mode, namely,
             freeze running stats (mean and var). Note: Effect on Batch Norm
             and its variants only.
+        norm_froze (bool): Whether to froze all norm layers
         with_cp (bool): Use checkpoint or not. Using checkpoint will save some
             memory while slowing down the training speed.
         zero_init_residual (bool): whether to use zero init for last norm layer
@@ -321,6 +322,7 @@ class ResNet(nn.Module):
                  frozen_stages=-1,
                  normalize=dict(type='BN', frozen=False),
                  norm_eval=True,
+                 norm_froze=False,
                  dcn=None,
                  stage_with_dcn=(False, False, False, False),
                  with_cp=False,
@@ -341,6 +343,7 @@ class ResNet(nn.Module):
         self.normalize = normalize
         self.with_cp = with_cp
         self.norm_eval = norm_eval
+        self.norm_froze = norm_froze
         self.dcn = dcn
         self.stage_with_dcn = stage_with_dcn
         if dcn is not None:
@@ -375,6 +378,8 @@ class ResNet(nn.Module):
             self.res_layers.append(layer_name)
 
         self._freeze_stages()
+        if self.norm_froze:
+            self._freeze_norm_layers()
 
         self.feat_dim = self.block.expansion * 64 * 2**(
             len(self.stage_blocks) - 1)
@@ -402,6 +407,12 @@ class ResNet(nn.Module):
             m = getattr(self, 'layer{}'.format(i))
             for param in m.parameters():
                 param.requires_grad = False
+
+    def _freeze_norm_layers(self):
+        for m in self.modules():
+            if isinstance(m, nn.BatchNorm2d):
+                for param in m.parameters():
+                    param.requires_grad = False
 
     def init_weights(self, pretrained=None):
         if isinstance(pretrained, str):
