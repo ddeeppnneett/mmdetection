@@ -71,13 +71,14 @@ class MaskIoUHead(nn.Module):
         mask_iou = self.mask_iou(x)
         return mask_iou
 
-    def get_target(self, sampling_results, gt_masks, mask_pred, mask_targets):
+    def get_target(self, sampling_results, gt_masks, mask_pred, mask_targets,
+                   img_metas):
         pos_proposals = [res.pos_bboxes for res in sampling_results]
         pos_assigned_gt_inds = [
             res.pos_assigned_gt_inds for res in sampling_results
         ]
         return mask_iou_target(pos_proposals, pos_assigned_gt_inds, gt_masks,
-                               mask_pred, mask_targets)
+                               mask_pred, mask_targets, img_metas)
 
     def loss(self, mask_iou_pred, mask_iou_targets):
         loss = dict()

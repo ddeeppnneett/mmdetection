@@ -100,6 +100,7 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
                       gt_labels,
                       gt_bboxes_ignore=None,
                       gt_masks=None,
+                      gt_mask_polys=None,
                       proposals=None):
         x = self.extract_feat(img)
 
@@ -199,7 +200,8 @@ class TwoStageDetector(BaseDetector, RPNTestMixin, BBoxTestMixin,
                 pos_mask_iou_pred = mask_iou_pred[range(mask_iou_pred.
                                                         size(0)), pos_labels]
                 mask_iou_targets = self.mask_iou_head.get_target(
-                    sampling_results, gt_masks, pos_mask_pred, mask_targets)
+                    sampling_results, gt_mask_polys, pos_mask_pred,
+                    mask_targets, img_meta)
                 loss_mask_iou = self.mask_iou_head.loss(
                     pos_mask_iou_pred, mask_iou_targets)
                 losses.update(loss_mask_iou)

@@ -112,6 +112,26 @@ class MaskTransform(object):
         return padded_masks
 
 
+class MaskPolyTransform(object):
+    """Preprocess mask polys.
+
+    1. flip the mask polys (if needed)
+    2. scale mask polys
+    """
+
+    def __call__(self, mask_polys, width, scale_factor, flip=False):
+        transformed_mask_polys = []
+        for polys in mask_polys:
+            polys = [np.array(poly) for poly in polys if poly != 'counts']
+            if flip:
+                for poly in polys:
+                    p = poly.copy()
+                    poly[0::2] = width - p[0::2] - 1
+            polys = [poly * scale_factor for poly in polys]
+            transformed_mask_polys.append(polys)
+        return transformed_mask_polys
+
+
 class SegMapTransform(object):
     """Preprocess semantic segmentation maps.
 

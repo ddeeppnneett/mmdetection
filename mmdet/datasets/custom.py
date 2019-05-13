@@ -6,7 +6,7 @@ from mmcv.parallel import DataContainer as DC
 from torch.utils.data import Dataset
 
 from .transforms import (ImageTransform, BboxTransform, MaskTransform,
-                         SegMapTransform, Numpy2Tensor)
+                         SegMapTransform, Numpy2Tensor, MaskPolyTransform)
 from .utils import to_tensor, random_scale
 from .extra_aug import ExtraAugmentation
 
@@ -46,6 +46,7 @@ class CustomDataset(Dataset):
                  num_max_proposals=1000,
                  flip_ratio=0,
                  with_mask=True,
+                 with_mask_iou=False,
                  with_crowd=True,
                  with_label=True,
                  with_semantic_seg=False,
@@ -92,6 +93,7 @@ class CustomDataset(Dataset):
 
         # with mask or not (reserved field, takes no effect)
         self.with_mask = with_mask
+        self.with_mask_iou = with_mask_iou
         # some datasets provide bbox annotations as ignore/crowd/difficult,
         # if `with_crowd` is True, then these info is returned.
         self.with_crowd = with_crowd
@@ -114,6 +116,7 @@ class CustomDataset(Dataset):
             size_divisor=self.size_divisor, **self.img_norm_cfg)
         self.bbox_transform = BboxTransform()
         self.mask_transform = MaskTransform()
+        self.mask_poly_transform = MaskPolyTransform()
         self.seg_transform = SegMapTransform(self.size_divisor)
         self.numpy2tensor = Numpy2Tensor()
 
@@ -228,8 +231,8 @@ class CustomDataset(Dataset):
         if self.proposals is not None:
             proposals = self.bbox_transform(proposals, img_shape, scale_factor,
                                             flip)
-            proposals = np.hstack(
-                [proposals, scores]) if scores is not None else proposals
+            proposals = np.hstack([proposals, scores
+                                   ]) if scores is not None else proposals
         gt_bboxes = self.bbox_transform(gt_bboxes, img_shape, scale_factor,
                                         flip)
         if self.with_crowd:
@@ -238,6 +241,9 @@ class CustomDataset(Dataset):
         if self.with_mask:
             gt_masks = self.mask_transform(ann['masks'], pad_shape,
                                            scale_factor, flip)
+        if self.with_mask_iou:
+            gt_mask_polys = self.mask_poly_transform(
+                ann['mask_polys'], img_info['width'], scale_factor, flip)
 
         ori_shape = (img_info['height'], img_info['width'], 3)
         img_meta = dict(
@@ -259,6 +265,8 @@ class CustomDataset(Dataset):
             data['gt_bboxes_ignore'] = DC(to_tensor(gt_bboxes_ignore))
         if self.with_mask:
             data['gt_masks'] = DC(gt_masks, cpu_only=True)
+        if self.with_mask_iou:
+            data['gt_mask_polys'] = DC(gt_mask_polys, cpu_only=True)
         if self.with_seg:
             data['gt_semantic_seg'] = DC(to_tensor(gt_seg), stack=True)
         return data
@@ -294,8 +302,8 @@ class CustomDataset(Dataset):
                     score = None
                 _proposal = self.bbox_transform(proposal, img_shape,
                                                 scale_factor, flip)
-                _proposal = np.hstack(
-                    [_proposal, score]) if score is not None else _proposal
+                _proposal = np.hstack([_proposal, score
+                                       ]) if score is not None else _proposal
                 _proposal = to_tensor(_proposal)
             else:
                 _proposal = None
